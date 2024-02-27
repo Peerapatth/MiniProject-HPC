@@ -12,4 +12,8 @@ Draw the Speed-up and Efficiency graph: must show an ideal line, Amdahl’s line
 
 ## Computer System Architecture
 
+<<<<<<< HEAD
 Detail and draw diagram for computer system architecture of the experiment.
+=======
+Detail and draw diagram for computer system architecture of the experiment.
+>>>>>>> daeb8234cbf5d85303f29d88b296d36585b3f4a7
