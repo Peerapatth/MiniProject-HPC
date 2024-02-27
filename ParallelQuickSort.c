@@ -1,3 +1,4 @@
+// Step 1: Include the MPI and openMP header files
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
@@ -8,6 +9,7 @@ void quicksort(int arr[], int low, int high);
 int partition(int arr[], int low, int high);
 void parallelQuicksort(int arr[], int low, int high);
 
+// Step 2: Add a parallel quicksort function using OpenM
 // Sequential Quicksort implementation
 void quicksort(int arr[], int low, int high)
 {
@@ -51,6 +53,7 @@ int partition(int arr[], int low, int high)
     return i + 1;
 }
 
+// Step 3: Add a parallelQuicksort function to wrap the parallel quicksort
 // Parallel Quicksort wrapper
 void parallelQuicksort(int arr[], int low, int high)
 {
@@ -62,6 +65,7 @@ void parallelQuicksort(int arr[], int low, int high)
     }
 }
 
+// Step 4: Main Function - MPI Initialization and Command-line Argument Check
 int main(int argc, char *argv[])
 {
     // MPI Initialization
@@ -89,6 +93,7 @@ int main(int argc, char *argv[])
     int *data = NULL;
     int dataSize = 0;
 
+    // Step 5: Read input data
     // Root process reads input data from the file
     if (rank == 0)
     {
@@ -117,6 +122,7 @@ int main(int argc, char *argv[])
         fclose(inputFile);
     }
 
+    // Step 6: MPI Broadcast - Broadcast Size and Data to All Processes
     // Broadcast the size of the data to all processes
     MPI_Bcast(&dataSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -128,6 +134,7 @@ int main(int argc, char *argv[])
 
     MPI_Bcast(data, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
 
+    // Step 7: Perform parallel Quicksort using OpenMP
     // Perform parallel Quicksort using OpenMP
 #pragma omp parallel
     {
@@ -142,8 +149,10 @@ int main(int argc, char *argv[])
         sortedData = (int *)malloc(dataSize * size * sizeof(int));
     }
 
+    // Step 8: MPI Gather - Gather Sorted Data to the Root Process
     MPI_Gather(data, dataSize, MPI_INT, sortedData, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
 
+    // Step 9: Write Sorted Data to the Output File on the Root Process
     // Write sorted data to the output file on the root process
     if (rank == 0)
     {
@@ -162,6 +171,7 @@ int main(int argc, char *argv[])
         fclose(outputFile);
     }
 
+    // Step 10: Free Allocated Memory and MPI Finalization
     // Free allocated memory
     free(data);
     free(sortedData);
