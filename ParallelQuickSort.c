@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include <omp.h>
+#include <time.h>
 
 // Function prototypes
 void quicksort(int arr[], int low, int high);
@@ -58,7 +59,7 @@ int partition(int arr[], int low, int high)
 void parallelQuicksort(int arr[], int low, int high)
 {
     // OpenMP parallel region with a single task to initiate parallel quicksort
-#pragma omp parallel 
+#pragma omp parallel
     {
 #pragma omp single
         quicksort(arr, low, high);
@@ -75,20 +76,9 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // Check if the correct number of command-line arguments is provided
-    if (argc != 3)
-    {
-        if (rank == 0)
-        {
-            fprintf(stderr, "Usage: %s input_file output_file\n", argv[0]);
-        }
-        MPI_Finalize();
-        return 1;
-    }
-
     // Input and output file names
-    const char *inputFileName = argv[1];
-    const char *outputFileName = argv[2];
+    const char *inputFileName = "input.txt";
+    const char *outputFileName = "result.txt";
 
     int *data = NULL;
     int dataSize = 0;
@@ -105,22 +95,21 @@ int main(int argc, char *argv[])
         }
 
         // Determine the size of the array
-        while (fscanf(inputFile, "%*d") != EOF)
-        {
-            dataSize++;
-        }
+        fscanf(inputFile, "%d\n", &dataSize);
 
-        // Rewind the file and read the data
-        rewind(inputFile);
         data = (int *)malloc(dataSize * sizeof(int));
 
         for (int i = 0; i < dataSize; i++)
         {
-            fscanf(inputFile, "%d", &data[i]);
+            fscanf(inputFile, "%d ", &data[i]);
         }
 
         fclose(inputFile);
     }
+
+    time_t start, end;
+    double cpu_time_used;
+    start = clock();
 
     // Step 6: MPI Broadcast - Broadcast Size and Data to All Processes
     // Broadcast the size of the data to all processes
@@ -134,6 +123,7 @@ int main(int argc, char *argv[])
 
     MPI_Bcast(data, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
 
+    omp_set_num_threads(size);
     // Step 7: Perform parallel Quicksort using OpenMP
     // Perform parallel Quicksort using OpenMP
 #pragma omp parallel
@@ -152,6 +142,13 @@ int main(int argc, char *argv[])
     // Step 8: MPI Gather - Gather Sorted Data to the Root Process
     MPI_Gather(data, dataSize, MPI_INT, sortedData, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
 
+    if (rank == 0)
+    {
+        end = clock();
+        cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+        printf("Time taken: %f\n", cpu_time_used);
+    }
+
     // Step 9: Write Sorted Data to the Output File on the Root Process
     // Write sorted data to the output file on the root process
     if (rank == 0)
@@ -163,7 +160,8 @@ int main(int argc, char *argv[])
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        for (int i = 0; i < dataSize * size; i++)
+        fprintf(outputFile, "%d\n", dataSize);
+        for (int i = 0; i < dataSize; i++)
         {
             fprintf(outputFile, "%d ", sortedData[i]);
         }
