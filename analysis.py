@@ -53,7 +53,7 @@ S = 0.1  # Fraction of serial code
 alpha = 0.1  # Communication overhead
 
 # Runtime with 1, 2, 4, 8 processors (example values)
-runtimes = [0.172563, 0.089987, 0.047290, 0.035725]
+runtimes = [0.152563, 0.089987, 0.055290, 0.039725]
 
 # Plot the graph
 plot_graph(N, S, alpha, runtimes)
