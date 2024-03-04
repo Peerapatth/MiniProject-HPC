@@ -13,3 +13,12 @@ Draw the Speed-up and Efficiency graph: must show an ideal line, Amdahl’s line
 ## Computer System Architecture
 
 Detail and draw diagram for computer system architecture of the experiment.
+
+- Processor
+  - Apple silicon M1
+- Memory
+  - 8GB
+- Storage
+  - 256GB
+- Operating System
+  - MacOS Sonoma 14.3.1 (23D60)

@@ -1,181 +1,183 @@
-// Step 1: Include the MPI and openMP header files
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
-#include <omp.h>
 #include <time.h>
+#include <unistd.h>
 
-// Function prototypes
-void quicksort(int arr[], int low, int high);
-int partition(int arr[], int low, int high);
-void parallelQuicksort(int arr[], int low, int high);
-
-// Step 2: Add a parallel quicksort function using OpenM
-// Sequential Quicksort implementation
-void quicksort(int arr[], int low, int high)
+void swap(int *arr, int i, int j)
 {
-    if (low < high)
-    {
-        // Partition the array and get the pivot position
-        int pivot = partition(arr, low, high);
-
-        // Recursively sort the subarrays on separate threads
-#pragma omp task
-        quicksort(arr, low, pivot - 1);
-
-#pragma omp task
-        quicksort(arr, pivot + 1, high);
-    }
+    int t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
 }
 
-// Helper function to partition the array
-int partition(int arr[], int low, int high)
+void quicksort(int *arr, int start, int end)
 {
-    int pivot = arr[high];
-    int i = low - 1;
+    if (end <= 0) // Base case correction
+        return;
 
-    for (int j = low; j <= high - 1; j++)
+    int pivot = arr[start + (end / 2)]; // Pivot selection correction
+    swap(arr, start, start + (end / 2));
+
+    int index = start;
+
+    for (int i = start + 1; i < start + end; i++)
     {
-        if (arr[j] <= pivot)
+        if (arr[i] < pivot)
         {
-            i++;
-            // Swap arr[i] and arr[j]
-            int temp = arr[i];
-            arr[i] = arr[j];
-            arr[j] = temp;
+            index++;
+            swap(arr, i, index);
         }
     }
 
-    // Swap arr[i + 1] and arr[high] to place pivot in the correct position
-    int temp = arr[i + 1];
-    arr[i + 1] = arr[high];
-    arr[high] = temp;
+    swap(arr, start, index);
 
-    return i + 1;
+    quicksort(arr, start, index - start);
+    quicksort(arr, index + 1, start + end - index - 1);
 }
 
-// Step 3: Add a parallelQuicksort function to wrap the parallel quicksort
-// Parallel Quicksort wrapper
-void parallelQuicksort(int arr[], int low, int high)
+int *merge(int *arr1, int n1, int *arr2, int n2)
 {
-    // OpenMP parallel region with a single task to initiate parallel quicksort
-#pragma omp parallel
+    int *result = (int *)malloc((n1 + n2) * sizeof(int));
+    int i = 0, j = 0, k = 0;
+
+    while (i < n1 && j < n2)
     {
-#pragma omp single
-        quicksort(arr, low, high);
+        if (arr1[i] < arr2[j])
+        {
+            result[k++] = arr1[i++];
+        }
+        else
+        {
+            result[k++] = arr2[j++];
+        }
     }
+
+    while (i < n1)
+    {
+        result[k++] = arr1[i++];
+    }
+
+    while (j < n2)
+    {
+        result[k++] = arr2[j++];
+    }
+
+    return result;
 }
 
-// Step 4: Main Function - MPI Initialization and Command-line Argument Check
 int main(int argc, char *argv[])
 {
-    // MPI Initialization
-    MPI_Init(&argc, &argv);
-
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    // Input and output file names
-    const char *inputFileName = "input.txt";
-    const char *outputFileName = "result.txt";
-
+    int number_of_elements;
     int *data = NULL;
-    int dataSize = 0;
+    int chunk_size, own_chunk_size;
+    int *chunk;
+    FILE *file = NULL;
+    double time_taken = 0; // Initialize time_taken
 
-    // Step 5: Read input data
-    // Root process reads input data from the file
-    if (rank == 0)
+    int number_of_process, rank_of_process;
+    int rc = MPI_Init(&argc, &argv);
+
+    if (rc != MPI_SUCCESS)
     {
-        FILE *inputFile = fopen(inputFileName, "r");
-        if (inputFile == NULL)
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+
+    MPI_Comm_size(MPI_COMM_WORLD, &number_of_process);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_process);
+
+    if (rank_of_process == 0)
+    {
+        file = fopen("input.txt", "r");
+        if (file == NULL)
         {
-            fprintf(stderr, "Error opening input file.\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            fprintf(stderr, "Error opening file\n");
+            exit(EXIT_FAILURE);
         }
 
-        // Determine the size of the array
-        fscanf(inputFile, "%d\n", &dataSize);
-
-        data = (int *)malloc(dataSize * sizeof(int));
-
-        for (int i = 0; i < dataSize; i++)
+        if (fscanf(file, "%d\n", &number_of_elements) != 1)
         {
-            fscanf(inputFile, "%d ", &data[i]);
+            fprintf(stderr, "Error reading number of elements\n");
+            exit(EXIT_FAILURE);
         }
 
-        fclose(inputFile);
-    }
+        chunk_size = (number_of_elements + number_of_process - 1) / number_of_process;
 
-    time_t start, end;
-    double cpu_time_used;
-    start = clock();
+        data = (int *)malloc(number_of_process * chunk_size * sizeof(int));
 
-    // Step 6: MPI Broadcast - Broadcast Size and Data to All Processes
-    // Broadcast the size of the data to all processes
-    MPI_Bcast(&dataSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    // Broadcast the data to all processes
-    if (rank != 0)
-    {
-        data = (int *)malloc(dataSize * sizeof(int));
-    }
-
-    MPI_Bcast(data, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
-
-    omp_set_num_threads(size);
-    // Step 7: Perform parallel Quicksort using OpenMP
-    // Perform parallel Quicksort using OpenMP
-#pragma omp parallel
-    {
-#pragma omp single
-        parallelQuicksort(data, 0, dataSize - 1);
-    }
-
-    // Gather sorted data to the root process
-    int *sortedData = NULL;
-    if (rank == 0)
-    {
-        sortedData = (int *)malloc(dataSize * size * sizeof(int));
-    }
-
-    // Step 8: MPI Gather - Gather Sorted Data to the Root Process
-    MPI_Gather(data, dataSize, MPI_INT, sortedData, dataSize, MPI_INT, 0, MPI_COMM_WORLD);
-
-    if (rank == 0)
-    {
-        end = clock();
-        cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-        printf("Time taken: %f\n", cpu_time_used);
-    }
-
-    // Step 9: Write Sorted Data to the Output File on the Root Process
-    // Write sorted data to the output file on the root process
-    if (rank == 0)
-    {
-        FILE *outputFile = fopen(outputFileName, "w");
-        if (outputFile == NULL)
+        for (int i = 0; i < number_of_elements; i++)
         {
-            fprintf(stderr, "Error opening output file.\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            if (fscanf(file, "%d ", &data[i]) != 1)
+            {
+                fprintf(stderr, "Error reading data\n");
+                exit(EXIT_FAILURE);
+            }
         }
 
-        fprintf(outputFile, "%d\n", dataSize);
-        for (int i = 0; i < dataSize; i++)
-        {
-            fprintf(outputFile, "%d ", sortedData[i]);
-        }
-
-        fclose(outputFile);
+        fclose(file);
     }
 
-    // Step 10: Free Allocated Memory and MPI Finalization
-    // Free allocated memory
+    MPI_Barrier(MPI_COMM_WORLD);
+    time_taken -= MPI_Wtime();
+
+    MPI_Bcast(&number_of_elements, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    chunk_size = (number_of_elements + number_of_process - 1) / number_of_process;
+    chunk = (int *)malloc(chunk_size * sizeof(int));
+
+    MPI_Scatter(data, chunk_size, MPI_INT, chunk, chunk_size, MPI_INT, 0, MPI_COMM_WORLD);
     free(data);
-    free(sortedData);
 
-    // MPI Finalization
+    own_chunk_size = (rank_of_process == number_of_process - 1) ? (number_of_elements - chunk_size * rank_of_process) : chunk_size;
+    quicksort(chunk, 0, own_chunk_size);
+
+    for (int step = 1; step < number_of_process; step *= 2)
+    {
+        if (rank_of_process % (2 * step) != 0)
+        {
+            MPI_Send(chunk, own_chunk_size, MPI_INT, rank_of_process - step, 0, MPI_COMM_WORLD);
+            break;
+        }
+
+        if (rank_of_process + step < number_of_process)
+        {
+            int received_chunk_size = (rank_of_process + 2 * step < number_of_process) ? chunk_size * step : number_of_elements - chunk_size * (rank_of_process + step);
+
+            int *chunk_received = (int *)malloc(received_chunk_size * sizeof(int));
+            MPI_Recv(chunk_received, received_chunk_size, MPI_INT, rank_of_process + step, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            int *merged_chunk = merge(chunk, own_chunk_size, chunk_received, received_chunk_size);
+            free(chunk);
+            free(chunk_received);
+            chunk = merged_chunk;
+            own_chunk_size += received_chunk_size;
+        }
+    }
+
+    time_taken += MPI_Wtime();
+
+    if (rank_of_process == 0)
+    {
+        file = fopen("result.txt", "w");
+        if (file == NULL)
+        {
+            fprintf(stderr, "Error opening output file\n");
+            exit(EXIT_FAILURE);
+        }
+
+        fprintf(file, "%d\n", own_chunk_size);
+
+        for (int i = 0; i < own_chunk_size; i++)
+        {
+            fprintf(file, "%d ", chunk[i]);
+        }
+
+        fclose(file);
+        printf("Quicksort %d ints on %d procs: %f secs\n", number_of_elements, number_of_process, time_taken);
+    }
+
+    free(chunk);
+
     MPI_Finalize();
-
     return 0;
 }
