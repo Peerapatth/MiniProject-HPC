@@ -131,8 +131,10 @@ int main(int argc, char *argv[])
     own_chunk_size = (rank_of_process == number_of_process - 1) ? (number_of_elements - chunk_size * rank_of_process) : chunk_size;
     quicksort(chunk, 0, own_chunk_size);
 
+    // Perform parallel merge
     for (int step = 1; step < number_of_process; step *= 2)
     {
+        // Send chunks to the appropriate processes for merging
         if (rank_of_process % (2 * step) != 0)
         {
             MPI_Send(chunk, own_chunk_size, MPI_INT, rank_of_process - step, 0, MPI_COMM_WORLD);
@@ -141,11 +143,21 @@ int main(int argc, char *argv[])
 
         if (rank_of_process + step < number_of_process)
         {
-            int received_chunk_size = (rank_of_process + 2 * step < number_of_process) ? chunk_size * step : number_of_elements - chunk_size * (rank_of_process + step);
+            int received_chunk_size;
+            if (rank_of_process + 2 * step < number_of_process)
+            {
+                received_chunk_size = chunk_size * step;
+            }
+            else
+            {
+                received_chunk_size = number_of_elements - chunk_size * (rank_of_process + step);
+            }
 
+            // Receive the chunk from the corresponding process
             int *chunk_received = (int *)malloc(received_chunk_size * sizeof(int));
             MPI_Recv(chunk_received, received_chunk_size, MPI_INT, rank_of_process + step, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
+            // Merge the received chunk with the local chunk
             int *merged_chunk = merge(chunk, own_chunk_size, chunk_received, received_chunk_size);
             free(chunk);
             free(chunk_received);
