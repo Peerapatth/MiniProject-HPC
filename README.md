@@ -8,6 +8,7 @@ Analyze performance of your parallel application, using Amdahl’s model and ana
 
 ## Graphs
 
+![Screenshot](Figure.png)
 Draw the Speed-up and Efficiency graph: must show an ideal line, Amdahl’s line, analytical line, and experimental runtime line with 1, 2, 4, 8 number of processors (cores/ranks).
 
 ## Computer System Architecture

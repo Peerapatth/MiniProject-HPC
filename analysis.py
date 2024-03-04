@@ -19,15 +19,29 @@ def plot_graph(N, S, alpha, runtimes):
     analytical_speedups = [analytical_speedup(n, S, alpha) for n in N]
     expermental_speedups = [runtimes[0] / runtime for runtime in runtimes]
 
+    # Calculate efficiency
+    ideal_efficiency = [1 for n in N]
+    amdahl_efficiency = [amdahl_speedup(n, S) / n for n in N]
+    analytical_efficiency = [analytical_speedup(n, S, alpha) / n for n in N]
+    expermental_efficiency = [
+        runtimes[0] / (n * runtime) for n, runtime in zip(N, runtimes)
+    ]
+
+    # Plot the graph
     plt.figure(figsize=(10, 6))
     # Plot the graph
-    plt.plot(N, ideal_speedups, label="Ideal speedup", linestyle="--")
-    plt.plot(N, amdahl_speedups, label="Amdahl's speedup")
-    plt.plot(N, analytical_speedups, label="Analytical speedup")
+    plt.plot(N, ideal_speedups, label="Ideal speedup", marker="o")
+    plt.plot(N, amdahl_speedups, label="Amdahl's speedup", marker="o")
+    plt.plot(N, analytical_speedups, label="Analytical speedup", marker="o")
     plt.plot(N, expermental_speedups, label="Experimental speedup", marker="o")
+    plt.plot(N, ideal_efficiency, label="Ideal efficiency", linestyle="--")
+    plt.plot(N, amdahl_efficiency, label="Amdahl's efficiency", linestyle="--")
+    plt.plot(N, analytical_efficiency, label="Analytical efficiency", linestyle="--")
+    plt.plot(N, expermental_efficiency, label="Experimental efficiency", linestyle="--")
+
     plt.xlabel("Number of processors")
-    plt.ylabel("Speedup")
-    plt.title("Speed-up vs Number of Processors")
+    plt.ylabel("Speedup/Efficiency")
+    plt.title("Amdah vs Analytical vs Experimental Speedup and Efficiency")
     plt.legend()
     plt.grid(True)
     plt.show()
